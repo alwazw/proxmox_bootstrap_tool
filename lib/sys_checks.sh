@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+
 check_root() {
     if [[ "$EUID" -ne 0 ]]; then
-        whiptail --title "Error" --msgbox "This script must be run as root." 10 60
+        whiptail --title "Error" --msgbox "This script must be run as root.\n\nPlease run with sudo:\n  sudo ./setup.sh" 12 60
         exit 1
     fi
 }
