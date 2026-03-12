@@ -1,63 +1,75 @@
-# 🚀 Proxmox VE 9 Node Bootstrap Tool
+# Proxmox VE 9 Node Bootstrap Framework
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Proxmox: 9.x](https://img.shields.io/badge/Proxmox-9.x-orange.svg)](https://www.proxmox.com)
-
-A modular, TUI-driven automation framework designed to standardize the deployment and optimization of Proxmox VE 9 nodes. This project demonstrates advanced Bash scripting, system architecture awareness, and hardware-specific automation.
+> A modular, TUI-driven automation framework for standardizing the deployment and optimization of Proxmox VE 9 (Trixie) nodes — engineered to align with SRE workflows and replace deprecated monolithic scripts with a scalable, maintainable solution.
 
 ---
 
-## 🛠 Project Architecture
+## 🚀 Quick Deploy
 
-Unlike monolithic scripts common in the homelab community, this tool uses a **modular "Plugin" architecture**. This ensures maintainability and allows for easy expansion without risking core logic stability.
+Run the following command directly in your Proxmox shell to launch the TUI installer. Recommended for fresh Proxmox 9.x installations.
 
-* **`setup.sh`**: The central orchestrator and TUI handler using `whiptail`.
-* **`lib/`**: Hardware abstraction layers and UI helper functions.
-* **`modules/`**: Decoupled task logic (Repo management, IOMMU, User Setup).
-
-
-
----
-
-## 💡 Technical Deep Dives
-
-### 1. Intelligent Bootloader Detection (UEFI vs. BIOS)
-One of the most common failure points in Proxmox automation is kernel parameter application. This tool implements a logic gate to verify the boot environment:
-* **UEFI Detection:** If `/sys/firmware/efi` is present, the script modifies `/etc/kernel/cmdline` and invokes `proxmox-boot-tool refresh`.
-* **Legacy BIOS Detection:** If absent, it targets `/etc/default/grub` and executes `update-grub`.
-
-This prevents "ghost configurations" where settings are applied to the wrong bootloader, ensuring GPU Passthrough (IOMMU) works on the first reboot.
-
-
-
-### 2. DEB822 Repository Migration
-Proxmox 9/Debian Trixie is moving toward the **DEB822** standard for package sources. This tool proactively:
-1.  Backs up legacy `.list` files to `/root/pve_repo_backup`.
-2.  Generates high-performance, combined `.sources` files.
-3.  Ensures GPG keys are correctly placed in `/etc/apt/keyrings/` rather than the deprecated `/etc/apt/trusted.gpg`.
-
-### 3. Secure Credential Handling
-To avoid hardcoded secrets, the tool utilizes a `whiptail`-driven UI to capture user intent. It includes:
-* Recursive password verification loops.
-* Masked input for security.
-* Automated `NOPASSWD` sudoer configuration for streamlined cluster administration.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-* A fresh installation of Proxmox VE 9.
-* Internet connectivity for package updates and GPG key retrieval.
-
-### Installation & Execution
 ```bash
-# Clone the repository
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/alwazw/proxmox_bootstrap_tool/main/install.sh)"
+```
+
+---
+
+## 🛠 Engineering Principles
+
+### 1. Hybrid Bootloader Abstraction (UEFI vs. BIOS)
+
+The framework includes intelligent boot environment detection to ensure architectural compatibility across modern and legacy hardware:
+
+- **UEFI / systemd-boot** — Detects `/sys/firmware/efi` and a ZFS-on-Root configuration, then automates kernel parameter injection via `proxmox-boot-tool refresh`.
+- **Legacy BIOS / GRUB** — Falls back to `/etc/default/grub` orchestration with `update-grub` execution hooks when EFI firmware is absent.
+
+### 2. DEB822 Repository Standardization
+
+Proxmox 9 adopts the DEB822 multi-line specification for package management. This framework automates migration from legacy `.list` files to modern `.sources` stanzas:
+
+| Objective | Implementation |
+|---|---|
+| **System Idempotency** | Prevents redundant entries and configuration drift |
+| **Optimized Mirrors** | Precise selection of No-Subscription and Ceph-Squid repositories |
+| **Cryptographic Security** | GPG keyring management under `/etc/apt/keyrings/` per current best practices |
+
+### 3. Modular Architecture
+
+The framework is structured into discrete, decoupled logic components for extensibility:
+
+```
+proxmox_bootstrap_tool/
+├── lib/            # Shared hardware abstraction layers & UI helper functions
+├── modules/        # Decoupled task logic (IOMMU passthrough, microcode updates, user provisioning)
+└── setup.sh        # Primary orchestrator — manages whiptail interface lifecycle & process flow
+```
+
+---
+
+## 📦 Manual Installation
+
+For environments requiring local inspection or manual control:
+
+```bash
 git clone https://github.com/alwazw/proxmox_bootstrap_tool
 cd proxmox_bootstrap_tool
-
-# Make the runner executable
 chmod +x setup.sh
-
-# Start the TUI installer
 ./setup.sh
+```
+
+---
+
+## 📅 Roadmap
+
+Active development is underway to evolve this tool into a comprehensive Infrastructure-as-Code (IaC) enabler.
+
+- [ ] **Ansible Orchestration Module** — Dynamic inventory generator and playbooks for large-scale cluster management
+- [ ] **Terraform & OpenTofu Integration** — Declarative VM deployment via API user provisioning and RBAC automation
+- [ ] **Security Hardening (CIS Compliance)** — SSH key-based auth enforcement and `fail2ban` integration for the Proxmox admin interface
+- [ ] **Automated Cluster Convergence** — Streamlined node integration into existing clusters via secure API token authentication
+
+---
+
+## 🤝 Contributing
+
+Contributions that enhance SRE operational efficiency or expand hardware compatibility are welcome. Please adhere to the abstraction patterns established in the `lib/` directory when submitting pull requests.
