@@ -53,8 +53,8 @@ To avoid hardcoded secrets, the tool utilizes a `whiptail`-driven UI to capture 
 ### Installation & Execution
 ```bash
 # Clone the repository
-git clone [https://github.com/alwazw/proxmox.git](https://github.com/alwazw/proxmox.git)
-cd proxmox
+git clone https://github.com/alwazw/proxmox_bootstrap_tool
+cd proxmox_bootstrap_tool
 
 # Make the runner executable
 chmod +x setup.sh
