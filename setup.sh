@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
+source ./lib/dep_check.sh
 source ./lib/sys_checks.sh
 source ./lib/ui_helpers.sh
+
+# Check dependencies immediately
+check_dependencies
 
 check_root
 check_cluster
