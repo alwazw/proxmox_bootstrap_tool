@@ -105,26 +105,26 @@ ERRORS=()
 run_task() {
     local task="$1"
     case $task in
-        UPDATE) source ./modules/system_update.sh ;;
-        REPOS)  source ./modules/repo_config.sh ;;
-        NAG)    source ./modules/disable_nag.sh ;;
-        USER)   source ./modules/user_setup.sh ;;
-        PASSWD) source ./modules/sudo_nopasswd.sh ;;
-        CEPH)   source ./modules/ceph_setup.sh ;;
-        HA)     systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" ;;
-        IOMMU)  source ./modules/hardware_config.sh ;;
-        VFIO)   source ./modules/vfio_config.sh ;;
-        ZFS)    source ./modules/zfs_tuning.sh ;;
-        SAMBA)  source ./modules/samba_setup.sh ;;
-        TUNING) source ./modules/network_tuning.sh ;;
-        ESSENTIALS) source ./modules/essential_services.sh ;;
-        HTOP)   apt-get install -y htop  &>/dev/null && msg_ok "INSTALLED HTOP" ;;
-        TMUX)   source ./modules/tmux_setup.sh ;;
-        CURL)   apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL & WGET" ;;
-        GIT)    apt-get install -y git   &>/dev/null && msg_ok "INSTALLED GIT" ;;
-        JQ)     apt-get install -y jq    &>/dev/null && msg_ok "INSTALLED JQ" ;;
-        NET)    apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" ;;
-        *)      echo -e "\e[33m⚠ Unknown task: $task — skipping.\e[0m" ;;
+        UPDATE) source ./modules/system_update.sh && return 0 || return 1 ;;
+        REPOS)  source ./modules/repo_config.sh && return 0 || return 1 ;;
+        NAG)    source ./modules/disable_nag.sh && return 0 || return 1 ;;
+        USER)   source ./modules/user_setup.sh && return 0 || return 1 ;;
+        PASSWD) source ./modules/sudo_nopasswd.sh && return 0 || return 1 ;;
+        CEPH)   source ./modules/ceph_setup.sh && return 0 || return 1 ;;
+        HA)     systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" && return 0 || return 1 ;;
+        IOMMU)  source ./modules/hardware_config.sh && return 0 || return 1 ;;
+        VFIO)   source ./modules/vfio_config.sh && return 0 || return 1 ;;
+        ZFS)    source ./modules/zfs_tuning.sh && return 0 || return 1 ;;
+        SAMBA)  source ./modules/samba_setup.sh && return 0 || return 1 ;;
+        TUNING) source ./modules/network_tuning.sh && return 0 || return 1 ;;
+        ESSENTIALS) source ./modules/essential_services.sh && return 0 || return 1 ;;
+        HTOP)   apt-get install -y htop &>/dev/null && msg_ok "INSTALLED HTOP" && return 0 || return 1 ;;
+        TMUX)   source ./modules/tmux_setup.sh && return 0 || return 1 ;;
+        CURL)   apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL & WGET" && return 0 || return 1 ;;
+        GIT)    apt-get install -y git &>/dev/null && msg_ok "INSTALLED GIT" && return 0 || return 1 ;;
+        JQ)     apt-get install -y jq &>/dev/null && msg_ok "INSTALLED JQ" && return 0 || return 1 ;;
+        NET)    apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" && return 0 || return 1 ;;
+        *)      echo -e "\e[33m⚠ Unknown task: $task — skipping.\e[0m" && return 0 ;;
     esac
 }
 
