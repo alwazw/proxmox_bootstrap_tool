@@ -9,7 +9,7 @@
 Run the following command directly in your Proxmox shell to launch the TUI installer. Recommended for fresh Proxmox 9.x installations.
 
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/alwazw/proxmox_bootstrap_tool/main/install.sh)"
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/alwazw/proxmox_bootstrap_tool/main/setup.sh)"
 ```
 
 ---
