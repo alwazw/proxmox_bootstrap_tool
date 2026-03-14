@@ -81,27 +81,27 @@ else
     whiptail --title "ADVANCED CONFIGURATION" --checklist \
     $'\nSELECT TASKS TO PERFORM (SPACE TO SELECT):' 22 75 14 \
     "DIV1"   "─── CONFIGURATION ──────────────────" OFF \
-    "USER"   "CREATE PRIVILEGED SUDO USER"          OFF \
-    "PASSWD" "SET SUDO TO NOPASSWD"                 OFF \
-    "NAG"    "DISABLE SUBSCRIPTION NAG"             OFF \
-    "REPOS"  "TRIXIE MODERN SOURCE FILES (DEB822)"  OFF \
-    "CEPH"   "CONFIGURE CEPH REPO & INSTALL"        OFF \
-    "HA"     "ENABLE HA SERVICES"                   OFF \
+    "USER"   "CREATE PRIVILEGED SUDO USER"          ON \
+    "PASSWD" "SET SUDO TO NOPASSWD"                 ON \
+    "NAG"    "DISABLE SUBSCRIPTION NAG"             ON \
+    "REPOS"  "TRIXIE MODERN SOURCE FILES (DEB822)"  ON \
+    "CEPH"   "CONFIGURE CEPH REPO & INSTALL"        ON \
+    "HA"     "ENABLE HA SERVICES"                   ON \
     "DIV2"   "─── HARDWARE & STORAGE ─────────────" OFF \
-    "IOMMU"  "HARDWARE PASSTHROUGH (GPU CHECK)"     OFF \
-    "VFIO"   "LOAD VFIO MODULES"                    OFF \
-    "ZFS"    "ZFS TUNE & MONTHLY SCRUB"             OFF \
-    "SAMBA"  "SAMBA INSTALL & CIFS MOUNT"           OFF \
-    "TUNING" "NETWORK MAX SOCKET BUFFERS"           OFF \
+    "IOMMU"  "HARDWARE PASSTHROUGH (GPU CHECK)"     ON \
+    "VFIO"   "LOAD VFIO MODULES"                    ON \
+    "ZFS"    "ZFS TUNE & MONTHLY SCRUB"             ON \
+    "SAMBA"  "SAMBA INSTALL & CIFS MOUNT"           ON \
+    "TUNING" "NETWORK MAX SOCKET BUFFERS"           ON \
     "DIV3"   "─── UPDATES & TOOLS ────────────────" OFF \
-    "UPDATE" "SYSTEM UPDATE & UPGRADE"              OFF \
-    "ESSENTIALS" "FAIL2BAN, CHRONY, SMARTD"         OFF \
-    "TMUX"   "INSTALL TMUX & AUTO-START BASHRC"     OFF \
-    "HTOP"   "INSTALL HTOP"                         OFF \
-    "CURL"   "INSTALL CURL & WGET"                  OFF \
-    "GIT"    "INSTALL GIT"                          OFF \
-    "JQ"     "INSTALL JQ"                           OFF \
-    "NET"    "INSTALL NET-TOOLS (IFCONFIG/IP)"      OFF \
+    "UPDATE" "SYSTEM UPDATE & UPGRADE"              ON \
+    "ESSENTIALS" "FAIL2BAN, CHRONY, SMARTD"         ON \
+    "TMUX"   "INSTALL TMUX & AUTO-START BASHRC"     ON \
+    "HTOP"   "INSTALL HTOP"                         ON \
+    "CURL"   "INSTALL CURL & WGET"                  ON \
+    "GIT"    "INSTALL GIT"                          ON \
+    "JQ"     "INSTALL JQ"                           ON \
+    "NET"    "INSTALL NET-TOOLS (IFCONFIG/IP)"      ON \
     3>&1 1>&2 2>&3 | tee /tmp/pve_choices
 
     EXIT_STATUS=${PIPESTATUS[0]}
