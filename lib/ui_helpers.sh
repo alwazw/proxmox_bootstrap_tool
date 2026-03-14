@@ -1,8 +1,5 @@
-#!/usr/bin/env bash
-
-msg_ok() { echo -e "\e[32m✔ $1\e[0m"; }
-
 get_user_credentials() {
+<<<<<<< HEAD
     # Buttons: Next (OK), Back (Cancel), Skip (Extra)
     # ESC will exit setup via setup.sh exit code handling
     NEW_USER=$(whiptail --title "User Setup" --ok-button "Next" --cancel-button "Back" --extra-button --extra-label "Skip" \
@@ -44,4 +41,32 @@ get_user_credentials() {
         fi
         whiptail --msgbox "Passwords do not match. Try again." 10 60
     done
+=======
+    # Input box with skip option
+    NEW_USER=$(whiptail --title "User Setup" --inputbox \
+        "Enter new privileged username:" 10 60 \
+        --ok-button "Enter New Password" \
+        --cancel-button "Skip — proceed without user" \
+        3>&1 1>&2 2>&3)
+
+    if [[ $? -ne 0 || -z "$NEW_USER" ]]; then
+        export USER_SKIPPED=true
+        return 0
+    fi
+
+    # Password entry
+    NEW_PASS=$(whiptail --title "Password" --passwordbox \
+        "Enter password for $NEW_USER:" 10 60 \
+        --ok-button "Confirm Password" \
+        --cancel-button "Skip — proceed without user" \
+        3>&1 1>&2 2>&3)
+
+    if [[ $? -ne 0 ]]; then
+        export USER_SKIPPED=true
+        return 0
+    fi
+
+    export NEW_USER NEW_PASS USER_ACTION="CREATE"
+    export USER_SKIPPED=false
+>>>>>>> origin/main
 }

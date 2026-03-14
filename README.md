@@ -2,6 +2,11 @@
 
 > A modular, TUI-driven automation framework for standardizing the deployment and optimization of Proxmox VE 9 (Trixie) nodes — engineered to align with SRE workflows and replace deprecated monolithic scripts with a scalable, maintainable solution.
 
+<p align="center">
+  <img src="banner.jpg" alt="Proxmox VE 9 Bootstrap Framework" width="100%">
+</p>
+
+
 ---
 
 ## 🚀 Quick Deploy
@@ -72,4 +77,4 @@ Active development is underway to evolve this tool into a comprehensive Infrastr
 
 ## 🤝 Contributing
 
-Contributions that enhance SRE operational efficiency or expand hardware compatibility are welcome. Please adhere to the abstraction patterns established in the `lib/` directory when submitting pull requests.
+Contributions that enhance SRE operational efficiency or expand hardware compatibility are welcome. Please adhere to the abstraction patterns established in the `root` directory when submitting pull requests.

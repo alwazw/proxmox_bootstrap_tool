@@ -33,18 +33,7 @@ source ./lib/ui_helpers.sh
 SKIP_CHECKS=false
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --skip-checks)
-            SKIP_CHECKS=true
-            ;;
-        -h|--help)
-            echo "Usage: $0 [--skip-checks]"
-            exit 0
-            ;;
-        *)
-            echo "Error: Unknown option: $1" >&2
-            echo "Usage: $0 [--skip-checks]" >&2
-            exit 1
-            ;;
+        --skip-checks) SKIP_CHECKS=true ;;
     esac
     shift
 done
@@ -64,13 +53,14 @@ trap "rm -f /tmp/pve_mode /tmp/pve_choices" EXIT
 CURRENT_STEP="MODE"
 SETUP_MODE=""
 FUNCTIONS=""
+USER_ACTION="SKIP"
 
 while true; do
     case "$CURRENT_STEP" in
         MODE)
             whiptail --title "PROXMOX VE 9 BOOTSTRAP TOOL" --radiolist \
             "\nSELECT SETUP MODE:" 15 65 2 \
-            "FULL" "RUN FULL SETUP PROCESS (RECOMMENDED)" ON \
+            "FULL"     "RUN FULL SETUP PROCESS (RECOMMENDED)" ON \
             "ADVANCED" "SELECT INDIVIDUAL COMPONENTS TO INSTALL" OFF \
             3>&1 1>&2 2>&3 > /tmp/pve_mode
 
@@ -85,31 +75,31 @@ while true; do
             ;;
 
         ADVANCED)
-            # DIV items are selectable but we filter them. In UI they are just separators.
+            # Use visual separators that are non-selectable or filtered
             whiptail --title "ADVANCED CONFIGURATION" --checklist \
-            $'\nSELECT TASKS TO PERFORM (SPACE TO SELECT):' 22 75 14 \
-            "DIV1"   "─── CONFIGURATION ──────────────────" OFF \
-            "USER"   "CREATE PRIVILEGED SUDO USER"          OFF \
-            "PASSWD" "SET SUDO TO NOPASSWD"                 OFF \
-            "NAG"    "DISABLE SUBSCRIPTION NAG"             OFF \
-            "REPOS"  "TRIXIE MODERN SOURCE FILES (DEB822)"  OFF \
-            "CEPH"   "CONFIGURE CEPH REPO & INSTALL"        OFF \
-            "HA"     "ENABLE HA SERVICES"                   OFF \
-            "DIV2"   "─── HARDWARE & STORAGE ─────────────" OFF \
-            "IOMMU"  "HARDWARE PASSTHROUGH (GPU CHECK)"     OFF \
-            "VFIO"   "LOAD VFIO MODULES"                    OFF \
-            "ZFS"    "ZFS TUNE & MONTHLY SCRUB"             OFF \
-            "SAMBA"  "SAMBA INSTALL & CIFS MOUNT"           OFF \
-            "TUNING" "NETWORK MAX SOCKET BUFFERS"           OFF \
-            "DIV3"   "─── UPDATES & TOOLS ────────────────" OFF \
-            "UPDATE" "SYSTEM UPDATE & UPGRADE"              OFF \
-            "ESSENTIALS" "FAIL2BAN, CHRONY, SMARTD"         OFF \
-            "TMUX"   "INSTALL TMUX & AUTO-START BASHRC"     OFF \
-            "HTOP"   "INSTALL HTOP"                         OFF \
-            "CURL"   "INSTALL CURL & WGET"                  OFF \
-            "GIT"    "INSTALL GIT"                          OFF \
-            "JQ"     "INSTALL JQ"                           OFF \
-            "NET"    "INSTALL NET-TOOLS (IFCONFIG/IP)"      OFF \
+            $'\nSELECT TASKS TO PERFORM (SPACE TO SELECT):' 26 75 18 \
+            "---1" "  ── CONFIGURATION ─────────────────────────" OFF \
+            "USER"     "  Create privileged sudo user"              ON  \
+            "PASSWD"   "  Set sudo to NOPASSWD"                     ON  \
+            "NAG"      "  Disable subscription nag"                 ON  \
+            "REPOS"    "  Trixie modern source files (DEB822)"      ON  \
+            "CEPH"     "  Configure Ceph repo & install"            ON  \
+            "HA"       "  Enable HA services"                       ON  \
+            "---2" "  ── HARDWARE & STORAGE ──────────────────────" OFF \
+            "IOMMU"   "  Hardware passthrough (GPU check)"          ON  \
+            "VFIO"    "  Load VFIO modules"                         ON  \
+            "ZFS"     "  ZFS tune & monthly scrub"                  ON  \
+            "SAMBA"   "  Samba install & CIFS mount"                ON  \
+            "TUNING"  "  Network max socket buffers"                ON  \
+            "---3" "  ── UPDATES & TOOLS ─────────────────────────" OFF \
+            "UPDATE"     "  System update & upgrade"                ON  \
+            "ESSENTIALS" "  Fail2ban, Chrony, Smartd"               ON  \
+            "TMUX"    "  Install tmux & auto-start bashrc"          ON  \
+            "HTOP"    "  Install htop"                              ON  \
+            "CURL"    "  Install curl & wget"                       ON  \
+            "GIT"     "  Install git"                               ON  \
+            "JQ"      "  Install jq"                                ON  \
+            "NET"     "  Install net-tools (ifconfig/ip)"           ON  \
             --ok-button "Next" --cancel-button "Back" \
             3>&1 1>&2 2>&3 > /tmp/pve_choices
 
@@ -117,8 +107,8 @@ while true; do
             if [[ $STATUS -eq 1 ]]; then CURRENT_STEP="MODE"; continue; fi
             if [[ $STATUS -ne 0 ]]; then exit 0; fi
 
-            CHOICES=$(cat /tmp/pve_choices | tr -d '"')
-            FUNCTIONS=$(echo "$CHOICES" | sed -e 's/DIV[1-3]//g' | xargs)
+            CHOICES=$(cat /tmp/pve_choices | sed -e 's/"---[0-9]"//g' | tr -d '"')
+            FUNCTIONS=$(echo "$CHOICES" | xargs)
             if [[ -z "$FUNCTIONS" ]]; then
                 whiptail --msgbox "No tasks selected." 10 40
                 continue
@@ -168,30 +158,31 @@ while true; do
     esac
 done
 
-# ── Task Execution ───────────────────────────────────────────────────────────
+# ── Task Execution ────────────────────────────────────────────────────────────
 ERRORS=()
 run_task() {
     local task="$1"
     case $task in
-        UPDATE) source ./modules/system_update.sh && return 0 || return 1 ;;
-        REPOS)  source ./modules/repo_config.sh && return 0 || return 1 ;;
-        NAG)    source ./modules/disable_nag.sh && return 0 || return 1 ;;
-        USER)   source ./modules/user_setup.sh && return 0 || return 1 ;;
-        PASSWD) source ./modules/sudo_nopasswd.sh && return 0 || return 1 ;;
-        CEPH)   source ./modules/ceph_setup.sh && return 0 || return 1 ;;
-        HA)     systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" && return 0 || return 1 ;;
-        IOMMU)  source ./modules/hardware_config.sh && return 0 || return 1 ;;
-        VFIO)   source ./modules/vfio_config.sh && return 0 || return 1 ;;
-        ZFS)    source ./modules/zfs_tuning.sh && return 0 || return 1 ;;
-        SAMBA)  source ./modules/samba_setup.sh && return 0 || return 1 ;;
-        TUNING) source ./modules/network_tuning.sh && return 0 || return 1 ;;
+        UPDATE)     source ./modules/system_update.sh     && return 0 || return 1 ;;
+        REPOS)      source ./modules/repo_config.sh       && return 0 || return 1 ;;
+        NAG)        source ./modules/disable_nag.sh       && return 0 || return 1 ;;
+        USER)       source ./modules/user_setup.sh        && return 0 || return 1 ;;
+        PASSWD)     source ./modules/sudo_nopasswd.sh     && return 0 || return 1 ;;
+        CEPH)       source ./modules/ceph_setup.sh        && return 0 || return 1 ;;
+        HA)         systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" && return 0 || return 1 ;;
+        IOMMU)      source ./modules/hardware_config.sh   && return 0 || return 1 ;;
+        VFIO)       source ./modules/vfio_config.sh       && return 0 || return 1 ;;
+        ZFS)        source ./modules/zfs_tuning.sh        && return 0 || return 1 ;;
+        SAMBA)      source ./modules/samba_setup.sh       && return 0 || return 1 ;;
+        TUNING)     source ./modules/network_tuning.sh    && return 0 || return 1 ;;
         ESSENTIALS) source ./modules/essential_services.sh && return 0 || return 1 ;;
-        HTOP)   apt-get install -y htop &>/dev/null && msg_ok "INSTALLED HTOP" && return 0 || return 1 ;;
-        TMUX)   source ./modules/tmux_setup.sh && return 0 || return 1 ;;
-        CURL)   apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL & WGET" && return 0 || return 1 ;;
-        GIT)    apt-get install -y git &>/dev/null && msg_ok "INSTALLED GIT" && return 0 || return 1 ;;
-        JQ)     apt-get install -y jq &>/dev/null && msg_ok "INSTALLED JQ" && return 0 || return 1 ;;
-        NET)    apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" && return 0 || return 1 ;;
+        HTOP)       apt-get install -y htop &>/dev/null   && msg_ok "INSTALLED HTOP" && return 0 || return 1 ;;
+        TMUX)       source ./modules/tmux_setup.sh        && return 0 || return 1 ;;
+        CURL)       apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL & WGET" && return 0 || return 1 ;;
+        GIT)        apt-get install -y git &>/dev/null    && msg_ok "INSTALLED GIT" && return 0 || return 1 ;;
+        JQ)         apt-get install -y jq &>/dev/null     && msg_ok "INSTALLED JQ" && return 0 || return 1 ;;
+        NET)        apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" && return 0 || return 1 ;;
+        *)          echo -e "\e[33m⚠ Unknown task: $task — skipping.\e[0m" && return 0 ;;
     esac
 }
 
@@ -207,11 +198,14 @@ for task in $FUNCTIONS; do
 done
 
 touch $BOOTSTRAP_FLAG
+
+# ── Completion Report ─────────────────────────────────────────────────────────
 echo -e "\n\e[32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
 echo -e "\e[32m  BOOTSTRAP COMPLETE\e[0m"
 echo -e "\e[32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
 [[ ${#ERRORS[@]} -gt 0 ]] && echo -e "\e[31m  FAILED TASKS: ${ERRORS[*]}\e[0m"
 
-if whiptail --title "BOOTSTRAP COMPLETE" --yes-button "REBOOT NOW" --no-button "REBOOT LATER" --yesno "SETUP FINISHED.\n\nREBOOT NOW?" 12 65; then
+if whiptail --title "BOOTSTRAP COMPLETE" --yes-button "REBOOT NOW" --no-button "REBOOT LATER" --yesno "SETUP FINISHED.\n\nA REBOOT IS RECOMMENDED TO APPLY KERNEL CHANGES.\n\nREBOOT NOW?" 12 65; then
+    echo -e "\e[32m✔ Rebooting...\e[0m"
     reboot
 fi
