@@ -3,34 +3,44 @@
 msg_ok() { echo -e "\e[32m✔ $1\e[0m"; }
 
 get_user_credentials() {
-    NEW_USER=$(whiptail --title "User Setup" --inputbox "Enter new privileged username:" 10 60 3>&1 1>&2 2>&3)
+    # Buttons: Next (OK), Back (Cancel), Skip (Extra)
+    # ESC will exit setup via setup.sh exit code handling
+    NEW_USER=$(whiptail --title "User Setup" --ok-button "Next" --cancel-button "Back" --extra-button --extra-label "Skip" \
+    --inputbox "Enter new privileged username:" 10 60 3>&1 1>&2 2>&3)
+    STATUS=$?
+
+    if [[ $STATUS -eq 3 ]]; then return 3; fi # SKIP
+    if [[ $STATUS -eq 1 ]]; then return 1; fi # BACK
+    if [[ $STATUS -ne 0 ]]; then return 2; fi # EXIT (ESC)
     
-    # Check if user cancelled
     if [[ -z "$NEW_USER" ]]; then
-        USER_ACTION="SKIP"
-        return 1
+        whiptail --msgbox "Username cannot be empty." 10 40
+        return 5 # Re-run username input
     fi
     
     while true; do
-        PASS1=$(whiptail --title "Password" --passwordbox "Enter password for $NEW_USER:" 10 60 3>&1 1>&2 2>&3)
+        # Buttons: Confirm (OK), Modify User (Cancel), Skip (Extra)
+        PASS1=$(whiptail --title "Password" --ok-button "Confirm" --cancel-button "Modify User" --extra-button --extra-label "Skip" \
+        --passwordbox "Enter password for $NEW_USER:" 10 60 3>&1 1>&2 2>&3)
+        STATUS=$?
         
-        # Check if user cancelled
-        if [[ -z "$PASS1" ]]; then
-            USER_ACTION="SKIP"
-            return 1
-        fi
+        if [[ $STATUS -eq 3 ]]; then return 3; fi # SKIP
+        if [[ $STATUS -eq 1 ]]; then return 5; fi # BACK TO USERNAME INPUT
+        if [[ $STATUS -ne 0 ]]; then return 2; fi # EXIT
+
+        # Buttons: Next (OK), Modify Pass (Cancel), Skip (Extra)
+        PASS2=$(whiptail --title "Password" --ok-button "Next" --cancel-button "Modify Password" --extra-button --extra-label "Skip" \
+        --passwordbox "Confirm password:" 10 60 3>&1 1>&2 2>&3)
+        STATUS=$?
         
-        PASS2=$(whiptail --title "Password" --passwordbox "Confirm password:" 10 60 3>&1 1>&2 2>&3)
+        if [[ $STATUS -eq 3 ]]; then return 3; fi # SKIP
+        if [[ $STATUS -eq 1 ]]; then continue; fi # RE-ENTER PASS1
+        if [[ $STATUS -ne 0 ]]; then return 2; fi # EXIT
         
         if [ "$PASS1" == "$PASS2" ] && [ ! -z "$PASS1" ]; then
             NEW_PASS="$PASS1"
-            # Prompt user to choose action
-            if whiptail --title "User Exists?" --yes-button "CREATE" --no-button "SKIP" --yesno "Create new user: $NEW_USER?" 10 60; then
-                USER_ACTION="CREATE"
-            else
-                USER_ACTION="SKIP"
-            fi
-            break
+            USER_ACTION="CREATE"
+            return 0 # SUCCESS
         fi
         whiptail --msgbox "Passwords do not match. Try again." 10 60
     done
