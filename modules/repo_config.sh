@@ -1,15 +1,26 @@
+# modules/repo_config.sh
+
 msg_ok "MIGRATING TO DEB822 REPOSITORIES"
 
 KEYRING="/etc/apt/keyrings/proxmox-release-trixie.gpg"
 mkdir -p /etc/apt/keyrings
+
+# Force re-download keyring
 wget -q https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg -O "$KEYRING"
 
-# Backup AND remove both legacy .list and existing .sources files
+# Nuke ALL existing repo files (both formats) — handles community script leftovers
 mkdir -p /root/pve_repo_backup
-mv /etc/apt/sources.list.d/*.list  /root/pve_repo_backup/ 2>/dev/null || true
-mv /etc/apt/sources.list.d/*.sources /root/pve_repo_backup/ 2>/dev/null || true
+find /etc/apt/sources.list.d/ -name "*.list" -o -name "*.sources" \
+  | xargs -I{} mv {} /root/pve_repo_backup/ 2>/dev/null || true
 
-# PVE no-subscription repo — correct component is 'pve-no-subscription'
+# Debian base (keep this clean)
+cat <<REPOS > /etc/apt/sources.list
+deb http://deb.debian.org/debian trixie main contrib
+deb http://deb.debian.org/debian trixie-updates main contrib
+deb http://security.debian.org/debian-security trixie-security main contrib
+REPOS
+
+# PVE no-subscription — component: pve-no-subscription
 cat <<REPOS > /etc/apt/sources.list.d/pve-no-sub.sources
 Types: deb
 URIs: http://download.proxmox.com/debian/pve
@@ -18,13 +29,13 @@ Components: pve-no-subscription
 Signed-By: $KEYRING
 REPOS
 
-# Ceph Squid repo — correct component is 'main'
+# Ceph Squid — component: no-subscription (NOT main)
 cat <<REPOS > /etc/apt/sources.list.d/ceph-squid.sources
 Types: deb
 URIs: http://download.proxmox.com/debian/ceph-squid
 Suites: trixie
-Components: main
+Components: no-subscription
 Signed-By: $KEYRING
 REPOS
 
-apt-get update &>/dev/null
+apt-get update
