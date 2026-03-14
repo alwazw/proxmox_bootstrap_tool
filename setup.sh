@@ -33,7 +33,18 @@ source ./lib/ui_helpers.sh
 SKIP_CHECKS=false
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --skip-checks) SKIP_CHECKS=true ;;
+        --skip-checks)
+            SKIP_CHECKS=true
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--skip-checks]"
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option: $1" >&2
+            echo "Usage: $0 [--skip-checks]" >&2
+            exit 1
+            ;;
     esac
     shift
 done
