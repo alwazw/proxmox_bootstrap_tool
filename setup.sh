@@ -29,6 +29,9 @@ source ./lib/dep_check.sh
 source ./lib/sys_checks.sh
 source ./lib/ui_helpers.sh
 
+# Export UI helpers for sourced modules
+export -f msg_ok
+
 # Parse arguments
 SKIP_CHECKS=false
 while [[ "$#" -gt 0 ]]; do
@@ -55,6 +58,10 @@ SETUP_MODE=""
 FUNCTIONS=""
 USER_ACTION="SKIP"
 
+# ANSI color for dividers
+DIV_TITLE=$(printf "\e[1;37m") # Bold White
+RESET=$(printf "\e[0m")
+
 while true; do
     case "$CURRENT_STEP" in
         MODE)
@@ -75,23 +82,25 @@ while true; do
             ;;
 
         ADVANCED)
-            # Use visual separators that are non-selectable or filtered
             whiptail --title "ADVANCED CONFIGURATION" --checklist \
             $'\nSELECT TASKS TO PERFORM (SPACE TO SELECT):' 26 75 18 \
-            "---1" "  ── CONFIGURATION ─────────────────────────" OFF \
+            "---1" "${DIV_TITLE}── CONFIGURATION ─────────────────────────${RESET}" OFF \
+            " "        " "                                             OFF \
             "USER"     "  Create privileged sudo user"              ON  \
             "PASSWD"   "  Set sudo to NOPASSWD"                     ON  \
             "NAG"      "  Disable subscription nag"                 ON  \
             "REPOS"    "  Trixie modern source files (DEB822)"      ON  \
             "CEPH"     "  Configure Ceph repo & install"            ON  \
             "HA"       "  Enable HA services"                       ON  \
-            "---2" "  ── HARDWARE & STORAGE ──────────────────────" OFF \
+            "---2" "${DIV_TITLE}── HARDWARE & STORAGE ──────────────────────${RESET}" OFF \
+            "  "       " "                                             OFF \
             "IOMMU"   "  Hardware passthrough (GPU check)"          ON  \
             "VFIO"    "  Load VFIO modules"                         ON  \
             "ZFS"     "  ZFS tune & monthly scrub"                  ON  \
             "SAMBA"   "  Samba install & CIFS mount"                ON  \
             "TUNING"  "  Network max socket buffers"                ON  \
-            "---3" "  ── UPDATES & TOOLS ─────────────────────────" OFF \
+            "---3" "${DIV_TITLE}── UPDATES & TOOLS ─────────────────────────${RESET}" OFF \
+            "   "      " "                                             OFF \
             "UPDATE"     "  System update & upgrade"                ON  \
             "ESSENTIALS" "  Fail2ban, Chrony, Smartd"               ON  \
             "TMUX"    "  Install tmux & auto-start bashrc"          ON  \
@@ -107,7 +116,7 @@ while true; do
             if [[ $STATUS -eq 1 ]]; then CURRENT_STEP="MODE"; continue; fi
             if [[ $STATUS -ne 0 ]]; then exit 0; fi
 
-            CHOICES=$(cat /tmp/pve_choices | sed -e 's/"---[0-9]"//g' | tr -d '"')
+            CHOICES=$(cat /tmp/pve_choices | sed -e 's/"---[0-9]"//g' -e 's/" "//g' -e 's/"  "//g' -e 's/"   "//g' | tr -d '"')
             FUNCTIONS=$(echo "$CHOICES" | xargs)
             if [[ -z "$FUNCTIONS" ]]; then
                 whiptail --msgbox "No tasks selected." 10 40
@@ -125,7 +134,6 @@ while true; do
         USER)
             get_user_credentials
             STATUS=$?
-            if [[ $STATUS -eq 5 ]]; then continue; fi # RE-RUN USER STEP (INTERNAL LOOP)
             if [[ $STATUS -eq 1 ]]; then # BACK
                 if [[ "$SETUP_MODE" == "FULL" ]]; then CURRENT_STEP="MODE"; else CURRENT_STEP="ADVANCED"; fi
                 continue
@@ -149,11 +157,20 @@ while true; do
             done
             [[ "$USER_ACTION" != "SKIP" && -n "$NEW_USER" ]] && SUMMARY+="\nUSER: $NEW_USER (ACTION: $USER_ACTION)"
 
-            if whiptail --title "FINAL CONFIRMATION" --yes-button "PROCEED" --no-button "BACK" --yesno "$SUMMARY\n\nPROCEED WITH EXECUTION?" 20 70; then
-                break
-            else
-                if [[ "$FUNCTIONS" == *"USER"* ]]; then CURRENT_STEP="USER"; else CURRENT_STEP="ADVANCED"; fi
-            fi
+            OPT=$(whiptail --title "FINAL CONFIRMATION" \
+                --menu "$SUMMARY\n\nPROCEED WITH EXECUTION?" 24 70 4 \
+                "YES"    "Proceed — run all selected tasks" \
+                "MODIFY" "Modify selected components" \
+                "BACK"   "Return to previous step" \
+                "EXIT"   "Exit setup" \
+                3>&1 1>&2 2>&3)
+
+            case $OPT in
+                YES)    break ;;
+                MODIFY) if [[ "$SETUP_MODE" == "FULL" ]]; then CURRENT_STEP="MODE"; else CURRENT_STEP="ADVANCED"; fi ;;
+                BACK)   if [[ "$FUNCTIONS" == *"USER"* ]]; then CURRENT_STEP="USER"; else CURRENT_STEP="ADVANCED"; fi ;;
+                *)      exit 0 ;;
+            esac
             ;;
     esac
 done
