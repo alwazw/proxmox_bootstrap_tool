@@ -1,6 +1,6 @@
 # modules/repo_config.sh
 
-msg_ok "MIGRATING TO DEB822 REPOSITORIES"
+#msg_ok "MIGRATING TO DEB822 REPOSITORIES"
 
 KEYRING="/etc/apt/keyrings/proxmox-release-trixie.gpg"
 mkdir -p /etc/apt/keyrings
