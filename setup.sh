@@ -78,41 +78,32 @@ advanced_selection() {
     user_config_logic
 }
 
-# ── STAGE 3: INTELLIGENT USER MANAGEMENT ──────────────────────────────────────
+# ── STAGE 3: USER MANAGEMENT ──────────────────────────────────────────────────
 user_config_logic() {
     if [[ $FUNCTIONS != *"USER"* ]]; then
         final_confirmation
         return
     fi
 
-    # 1. Audit System Users
-    # Get users with UID >= 1000 who are in the sudo/admin groups
+    # Audit System Users for transparency
     SUDO_USERS=$(grep -Po '^sudo:.*:\K.*|^admin:.*:\K.*' /etc/group | tr ',' ' ' | xargs)
-    # Get all other human users (UID >= 1000) not in sudo
-    ALL_HUMAN=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | xargs)
+    ALL_HUMAN=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | awk -F: '{print $1}' | xargs)
     
     USER_LIST_MSG="EXISTING SYSTEM USERS:\n"
     USER_LIST_MSG+="  • Sudo Admins: ${SUDO_USERS:-None}\n"
-    USER_LIST_MSG+="  • Other Users: ${ALL_HUMAN:-None}\n\n"
+    USER_LIST_MSG+="  • All Accounts: ${ALL_HUMAN:-None}\n\n"
 
-    # 2. Action Menu
-    USER_ACTION=$(whiptail --title "USER CONFIGURATION" --menu \
-    "$USER_LIST_MSG Select your path:" 18 70 3 \
-    "PROCEED" "Enter username to Create or Update" \
-    "SKIP"    "Remove User/Sudo tasks from this run" 3>&1 1>&2 2>&3)
+    NEW_USER=$(whiptail --title "USER SETUP" --inputbox \
+    "$USER_LIST_MSG Enter username to create or update (Esc/Cancel to skip):" 18 70 3>&1 1>&2 2>&3)
 
-    [[ $? -ne 0 ]] && { [[ "$SETUP_MODE" == "ADVANCED" ]] && advanced_selection || main_menu; }
-
-    if [[ "$USER_ACTION" == "SKIP" ]]; then
+    # If user cancels or leaves blank, we remove USER/PASSWD from the task list
+    if [[ $? -ne 0 || -z "$NEW_USER" ]]; then
         FUNCTIONS=$(echo "$FUNCTIONS" | sed 's/USER//;s/PASSWD//' | xargs)
         final_confirmation
         return
     fi
 
-    # 3. Username Input & Conflict Check
-    NEW_USER=$(whiptail --title "USER SETUP" --inputbox "Enter username:" 10 60 3>&1 1>&2 2>&3)
-    [[ -z "$NEW_USER" ]] && user_config_logic
-
+    # Warning prompt for existing users
     if id "$NEW_USER" &>/dev/null; then
         if ! whiptail --title "WARNING: USER EXISTS" --yesno \
         "The user '$NEW_USER' already exists.\n\nProceeding will OVERWRITE the existing password and ensure sudo privileges.\n\nContinue?" 12 65; then
@@ -121,33 +112,66 @@ user_config_logic() {
         fi
     fi
 
-    # 4. Credential Collection (Sets NEW_PASS)
-    # This calls your internal library function for password masking/confirmation
+    # Collect Password (sets NEW_PASS)
     get_user_credentials "$NEW_USER" 
     
     final_confirmation
 }
 
-# ── STAGE 4: FINAL SUMMARY ────────────────────────────────────────────────────
+# ── STAGE 4: EXECUTION ────────────────────────────────────────────────────────
+run_task() {
+    local task="$1"
+    case $task in
+        UPDATE)     source ./modules/system_update.sh     ;;
+        REPOS)      source ./modules/repo_config.sh       ;;
+        NAG)        source ./modules/disable_nag.sh       ;;
+        USER)       source ./modules/user_setup.sh        ;;
+        PASSWD)     source ./modules/sudo_nopasswd.sh     ;;
+        CEPH)       source ./modules/ceph_setup.sh        ;;
+        HA)         systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" ;;
+        IOMMU)      source ./modules/hardware_config.sh   ;;
+        VFIO)       source ./modules/vfio_config.sh       ;;
+        ZFS)        source ./modules/zfs_tuning.sh        ;;
+        SAMBA)      source ./modules/samba_setup.sh       ;;
+        TUNING)     source ./modules/network_tuning.sh    ;;
+        ESSENTIALS) source ./modules/essential_services.sh ;;
+        HTOP)       apt-get install -y htop &>/dev/null   && msg_ok "INSTALLED HTOP" ;;
+        TMUX)       source ./modules/tmux_setup.sh        ;;
+        CURL)       apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL/WGET" ;;
+        GIT)        apt-get install -y git &>/dev/null    && msg_ok "INSTALLED GIT" ;;
+        JQ)         apt-get install -y jq &>/dev/null     && msg_ok "INSTALLED JQ" ;;
+        NET)        apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" ;;
+    esac
+}
+
+execute_tasks() {
+    ERRORS=()
+    for task in $FUNCTIONS; do
+        echo -e "\n\e[36m▶ Running: $task\e[0m"
+        if ! run_task "$task"; then
+            echo -e "\e[31m✖ FAILED: $task\e[0m"
+            ERRORS+=("$task")
+        fi
+    done
+
+    touch "/etc/proxmox-bootstrap.done"
+    echo -e "\n\e[32m✔ BOOTSTRAP COMPLETE\e[0m"
+    
+    if whiptail --title "FINISHED" --yesno "Reboot now to apply changes?" 10 60; then
+        reboot
+    fi
+}
+
 final_confirmation() {
     local SUMMARY="SUMMARY OF OPERATIONS:\n\n"
     for task in $FUNCTIONS; do SUMMARY+="  • $task\n"; done
-    
-    if [[ $FUNCTIONS == *"USER"* ]]; then
-        SUMMARY+="\nTARGET USER: $NEW_USER\n(Password will be applied/updated)"
-    fi
+    [[ $FUNCTIONS == *"USER"* ]] && SUMMARY+="\nTARGET USER: $NEW_USER (Update/Create)"
 
     if whiptail --title "FINAL CONFIRMATION" --yesno "$SUMMARY\n\nBegin execution?" 22 70; then
         execute_tasks
     else
         user_config_logic
     fi
-}
-
-# ── STAGE 5: EXECUTION ────────────────────────────────────────────────────────
-execute_tasks() {
-    # [Internal execution logic as previously defined...]
-    # Ensure run_task and your ERRORS array loop are present here.
 }
 
 main_menu
