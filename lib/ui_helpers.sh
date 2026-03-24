@@ -1,7 +1,7 @@
 get_user_credentials() {
     # Input box with skip option
     NEW_USER=$(whiptail --title "User Setup" --inputbox \
-        "Enter new privileged username:" 10 80 \
+        "Enter new privileged username:" 10 100 \
         --ok-button "Enter New Password" \
         --cancel-button "Skip — proceed without user" \
         3>&1 1>&2 2>&3)
@@ -13,7 +13,7 @@ get_user_credentials() {
 
     # Password entry
     NEW_PASS=$(whiptail --title "Password" --passwordbox \
-        "Enter password for $NEW_USER:" 10 80 \
+        "Enter password for $NEW_USER:" 10 100 \
         --ok-button "Confirm Password" \
         --cancel-button "Skip — proceed without user" \
         3>&1 1>&2 2>&3)
