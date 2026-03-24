@@ -3,9 +3,17 @@
 # --- STANDALONE BOOTSTRAP LOGIC ---
 if [[ ! -f "./lib/dep_check.sh" || ! -d "./modules" ]]; then
     if [[ -n "$STANDALONE_INTERNAL" ]]; then
-        echo "✖ ERROR: Failed to initialize framework."
+        echo -e "\n\e[31m✖ ERROR: Framework initialization failed. Check network or repository state.\e[0m\n"
         exit 1
     fi
+
+    # Check for core bootstrap requirements
+    if ! command -v git &>/dev/null && ! (command -v wget &>/dev/null && command -v tar &>/dev/null); then
+        echo -e "\n\e[31m✖ ERROR: 'git' or ('wget' and 'tar') are required for standalone execution.\e[0m"
+        echo "Install dependencies: apt-get install -y git wget tar"
+        exit 1
+    fi
+
     echo "▶ Initializing full framework (standalone mode detected)..."
     TMP_DIR=$(mktemp -d)
     REPO_URL="https://github.com/alwazw/proxmox_bootstrap_tool"
@@ -14,10 +22,16 @@ if [[ ! -f "./lib/dep_check.sh" || ! -d "./modules" ]]; then
         cp -r ../lib ../modules ../setup.sh "$TMP_DIR/"
     else
         if command -v git &>/dev/null; then
-            git clone -q "$REPO_URL" "$TMP_DIR" || (wget -qO- "$REPO_URL/archive/refs/heads/main.tar.gz" | tar xz -C "$TMP_DIR" --strip-components=1)
+            git clone -q "$REPO_URL" "$TMP_DIR" || (wget -qO- "$REPO_URL/archive/refs/heads/main.tar.gz" | tar xz -C "$TMP_DIR" --strip-components=1 2>/dev/null)
         else
-            wget -qO- "$REPO_URL/archive/refs/heads/main.tar.gz" | tar xz -C "$TMP_DIR" --strip-components=1
+            wget -qO- "$REPO_URL/archive/refs/heads/main.tar.gz" | tar xz -C "$TMP_DIR" --strip-components=1 2>/dev/null
         fi
+    fi
+
+    if [[ ! -f "$TMP_DIR/lib/dep_check.sh" ]]; then
+        echo -e "\n\e[31m✖ ERROR: Failed to fetch framework components.\e[0m\n"
+        rm -rf "$TMP_DIR"
+        exit 1
     fi
 
     cd "$TMP_DIR" || exit 1
@@ -58,10 +72,6 @@ SETUP_MODE=""
 FUNCTIONS=""
 USER_ACTION="SKIP"
 
-# ANSI color for dividers
-DIV_TITLE=$(printf "\e[1;37m") # Bold White
-RESET=$(printf "\e[0m")
-
 while true; do
     case "$CURRENT_STEP" in
         MODE)
@@ -84,7 +94,7 @@ while true; do
         ADVANCED)
             whiptail --title "ADVANCED CONFIGURATION" --checklist \
             $'\nSELECT TASKS TO PERFORM (SPACE TO SELECT):' 26 75 18 \
-            "---1" "${DIV_TITLE}── CONFIGURATION ─────────────────────────${RESET}" OFF \
+            "---1" "  ── CONFIGURATION ─────────────────────────" OFF \
             " "        " "                                             OFF \
             "USER"     "  Create privileged sudo user"              ON  \
             "PASSWD"   "  Set sudo to NOPASSWD"                     ON  \
@@ -92,14 +102,14 @@ while true; do
             "REPOS"    "  Trixie modern source files (DEB822)"      ON  \
             "CEPH"     "  Configure Ceph repo & install"            ON  \
             "HA"       "  Enable HA services"                       ON  \
-            "---2" "${DIV_TITLE}── HARDWARE & STORAGE ──────────────────────${RESET}" OFF \
+            "---2" "  ── HARDWARE & STORAGE ──────────────────────" OFF \
             "  "       " "                                             OFF \
             "IOMMU"   "  Hardware passthrough (GPU check)"          ON  \
             "VFIO"    "  Load VFIO modules"                         ON  \
             "ZFS"     "  ZFS tune & monthly scrub"                  ON  \
             "SAMBA"   "  Samba install & CIFS mount"                ON  \
             "TUNING"  "  Network max socket buffers"                ON  \
-            "---3" "${DIV_TITLE}── UPDATES & TOOLS ─────────────────────────${RESET}" OFF \
+            "---3" "  ── UPDATES & TOOLS ─────────────────────────" OFF \
             "   "      " "                                             OFF \
             "UPDATE"     "  System update & upgrade"                ON  \
             "ESSENTIALS" "  Fail2ban, Chrony, Smartd"               ON  \
@@ -134,6 +144,7 @@ while true; do
         USER)
             get_user_credentials
             STATUS=$?
+            if [[ $STATUS -eq 5 ]]; then continue; fi # RE-RUN USER STEP (INTERNAL LOOP)
             if [[ $STATUS -eq 1 ]]; then # BACK
                 if [[ "$SETUP_MODE" == "FULL" ]]; then CURRENT_STEP="MODE"; else CURRENT_STEP="ADVANCED"; fi
                 continue
@@ -219,7 +230,7 @@ if [[ ${#ERRORS[@]} -eq 0 ]]; then
     touch "$BOOTSTRAP_FLAG"
 fi
 
-# ── Completion Report ─────────────────────────────────────────────────────────
+# ── Completion Report ────────────────────────────────━━━━━━━━━━━━━━━━━━━━━━━━━
 echo -e "\n\e[32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
 echo -e "\e[32m  BOOTSTRAP COMPLETE\e[0m"
 echo -e "\e[32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"

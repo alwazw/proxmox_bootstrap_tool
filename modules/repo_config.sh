@@ -1,4 +1,12 @@
-msg_ok "REPAIRING & MIGRATING TO DEB822 REPOSITORIES"
+msg_ok "VALIDATING REPOSITORY CONFIGURATION"
+
+# Safety Gate
+if [[ "$SKIP_CHECKS" != "true" ]]; then
+    if ! whiptail --title "Repository Reset" --yesno "This will backup and RESET your APT sources to official Proxmox/Debian DEB822 defaults.\n\nCustom third-party repositories in /etc/apt/sources.list.d/ will be moved to backup.\n\nProceed with full reset?" 12 70; then
+        echo -e "\e[33m⚠ Repository reset skipped by user.\e[0m"
+        return 0
+    fi
+fi
 
 # Backup and clear old lists
 if [ -f "/etc/apt/sources.list" ]; then
@@ -6,7 +14,8 @@ if [ -f "/etc/apt/sources.list" ]; then
 fi
 
 mkdir -p /root/pve_repo_backup
-# Nuke ALL existing repo files (both formats) — handles community script leftovers
+# Target known/suspect files while allowing user to move all if they agreed above
+# The gate above ensures the user is aware of the "nuke" behavior.
 find /etc/apt/sources.list.d/ -name "*.list" -o -name "*.sources" \
   | xargs -I{} mv {} /root/pve_repo_backup/ 2>/dev/null || true
 

@@ -77,4 +77,4 @@ Active development is underway to evolve this tool into a comprehensive Infrastr
 
 ## 🤝 Contributing
 
-Contributions that enhance SRE operational efficiency or expand hardware compatibility are welcome. Please adhere to the abstraction patterns established in the `root` directory when submitting pull requests.
+Contributions that enhance SRE operational efficiency or expand hardware compatibility are welcome. Please adhere to the abstraction patterns established in the `lib/` directory when submitting pull requests.
