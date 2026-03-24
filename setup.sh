@@ -34,7 +34,9 @@ check_dependencies
 check_root "false"
 check_cluster "false"
 
-# ── NAVIGATION WRAPPER ────────────────────────────────────────────────────────
+# ── NAVIGATION LOGIC ──────────────────────────────────────────────────────────
+
+# Stage 1: Main Mode
 main_menu() {
     SETUP_MODE=$(whiptail --title "PROXMOX VE 9 BOOTSTRAP" --clear --cancel-button "Exit" \
     --radiolist "SELECT SETUP MODE:" 15 65 2 \
@@ -47,10 +49,11 @@ main_menu() {
         advanced_selection
     else
         FUNCTIONS="REPOS UPDATE NAG USER PASSWD CEPH HA IOMMU VFIO ZFS SAMBA TUNING HTOP TMUX CURL GIT JQ NET ESSENTIALS"
-        user_logic_flow
+        user_management_flow
     fi
 }
 
+# Stage 2: Advanced Component Selection
 advanced_selection() {
     CHOICES=$(whiptail --title "ADVANCED CONFIGURATION" --checklist \
     "SELECT TASKS (SPACE to select):" 26 75 16 \
@@ -61,7 +64,7 @@ advanced_selection() {
     "PASSWD"   "  Set sudo to NOPASSWD" ON \
     "CEPH"     "  Configure Ceph repo" ON \
     "HA"       "  Enable HA services" ON \
-    "IOMMU"    "  Hardware passthrough" ON \
+    "IOMMU"    "  Hardware passthrough (GPU)" ON \
     "VFIO"     "  Load VFIO modules" ON \
     "ZFS"      "  ZFS tune & scrub" ON \
     "SAMBA"    "  Samba/CIFS mount" ON \
@@ -74,28 +77,34 @@ advanced_selection() {
     [[ $? -ne 0 ]] && main_menu
 
     FUNCTIONS=$(echo "$CHOICES" | tr -d '"')
-    user_logic_flow
+    user_management_flow
 }
 
-user_logic_flow() {
+# Stage 3: User Logic
+user_management_flow() {
     if [[ $FUNCTIONS == *"USER"* ]]; then
-        # Fetch current non-system users (UID >= 1000)
-        EXISTING_USERS=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | xargs)
+        # Identify non-system users (UID >= 1000) to help user avoid conflicts
+        EXISTING=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd | xargs)
         
-        USER_CHOICE=$(whiptail --title "USER MANAGEMENT" --menu \
-        "Current Users: ${EXISTING_USERS:-None}\n\nSelect action:" 15 65 3 \
-        "CREATE" "Create a new privileged user" \
-        "EXISTING" "Use an existing user for sudo config" \
-        "SKIP" "Do not perform user/sudo setup" 3>&1 1>&2 2>&3)
+        USER_ACTION=$(whiptail --title "USER MANAGEMENT" --menu \
+        "Current Users: ${EXISTING:-None}\n\nSelect how to handle user setup:" 15 65 3 \
+        "CREATE"   "Create a brand new sudo user" \
+        "EXISTING" "Use an existing user for configurations" \
+        "SKIP"     "Skip user/sudo tasks entirely" 3>&1 1>&2 2>&3)
 
-        case $USER_CHOICE in
+        [[ $? -ne 0 ]] && { [[ "$SETUP_MODE" == "ADVANCED" ]] && advanced_selection || main_menu; }
+
+        case $USER_ACTION in
             CREATE)
-                get_user_credentials # Updates NEW_USER, NEW_PASS
+                # Calls your existing ui_helpers/lib function
+                get_user_credentials 
                 ;;
             EXISTING)
-                NEW_USER=$(whiptail --inputbox "Enter existing username to configure:" 10 60 3>&1 1>&2 2>&3)
+                NEW_USER=$(whiptail --inputbox "Enter the existing username to authorize:" 10 60 3>&1 1>&2 2>&3)
+                [[ -z "$NEW_USER" ]] && user_management_flow
                 ;;
-            *)
+            SKIP)
+                # Strip USER and PASSWD from the task list
                 FUNCTIONS=$(echo "$FUNCTIONS" | sed 's/USER//;s/PASSWD//' | xargs)
                 ;;
         esac
@@ -103,24 +112,67 @@ user_logic_flow() {
     final_confirmation
 }
 
+# Stage 4: Execution Confirmation
 final_confirmation() {
-    SUMMARY="READY TO EXECUTE:\n"
-    for task in $FUNCTIONS; do SUMMARY+=" • $task\n"; done
+    local SUMMARY="THE FOLLOWING TASKS WILL BE PERFORMED:\n\n"
+    for task in $FUNCTIONS; do SUMMARY+="  • $task\n"; done
     [[ -n "$NEW_USER" ]] && SUMMARY+="\nTARGET USER: $NEW_USER"
 
-    whiptail --title "FINAL CONFIRMATION" --yesno "$SUMMARY\n\nProceed with installation?" 20 70 3>&1 1>&2 2>&3
-    
-    if [[ $? -eq 0 ]]; then
+    if whiptail --title "FINAL CONFIRMATION" --yesno "$SUMMARY\n\nProceed with execution?" 22 70 3>&1 1>&2 2>&3; then
         execute_tasks
     else
-        main_menu
+        # Instead of "Modify", we just step back to the user flow
+        user_management_flow
     fi
 }
 
-# ── EXECUTION ─────────────────────────────────────────────────────────────────
-execute_tasks() {
-    # ... [Same task execution loop as your previous script] ...
-    # Ensure run_task and ERRORS array are included here
+# ── EXECUTION ENGINE ──────────────────────────────────────────────────────────
+
+run_task() {
+    local task="$1"
+    case $task in
+        UPDATE)     source ./modules/system_update.sh     ;;
+        REPOS)      source ./modules/repo_config.sh       ;;
+        NAG)        source ./modules/disable_nag.sh       ;;
+        USER)       source ./modules/user_setup.sh        ;;
+        PASSWD)     source ./modules/sudo_nopasswd.sh     ;;
+        CEPH)       source ./modules/ceph_setup.sh        ;;
+        HA)         systemctl enable pve-ha-lrm pve-ha-crm &>/dev/null && msg_ok "ENABLED HA" ;;
+        IOMMU)      source ./modules/hardware_config.sh   ;;
+        VFIO)       source ./modules/vfio_config.sh       ;;
+        ZFS)        source ./modules/zfs_tuning.sh        ;;
+        SAMBA)      source ./modules/samba_setup.sh       ;;
+        TUNING)     source ./modules/network_tuning.sh    ;;
+        ESSENTIALS) source ./modules/essential_services.sh ;;
+        HTOP)       apt-get install -y htop &>/dev/null   && msg_ok "INSTALLED HTOP" ;;
+        TMUX)       source ./modules/tmux_setup.sh        ;;
+        CURL)       apt-get install -y curl wget &>/dev/null && msg_ok "INSTALLED CURL/WGET" ;;
+        GIT)        apt-get install -y git &>/dev/null    && msg_ok "INSTALLED GIT" ;;
+        JQ)         apt-get install -y jq &>/dev/null     && msg_ok "INSTALLED JQ" ;;
+        NET)        apt-get install -y net-tools &>/dev/null && msg_ok "INSTALLED NET-TOOLS" ;;
+    esac
 }
 
+execute_tasks() {
+    ERRORS=()
+    for task in $FUNCTIONS; do
+        echo -e "\n\e[36m▶ Running: $task\e[0m"
+        if ! run_task "$task"; then
+            echo -e "\e[31m✖ FAILED: $task\e[0m"
+            ERRORS+=("$task")
+        fi
+    done
+
+    # Completion Flag
+    touch "/etc/proxmox-bootstrap.done"
+
+    echo -e "\n\e[32m✔ BOOTSTRAP COMPLETE\e[0m"
+    [[ ${#ERRORS[@]} -gt 0 ]] && echo -e "\e[31m  FAILED TASKS: ${ERRORS[*]}\e[0m"
+
+    if whiptail --title "FINISHED" --yesno "Reboot now to apply changes?" 10 60; then
+        reboot
+    fi
+}
+
+# Start the flow
 main_menu
